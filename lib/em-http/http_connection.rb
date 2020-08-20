@@ -173,35 +173,41 @@ module EventMachine
       @clients = []
       @pending = []
 
-      @p = Http::Parser.new
-      @p.header_value_type = :mixed
-      @p.on_headers_complete = proc do |h|
-        if client
-          if @p.status_code == 100
-            client.send_request_body
-            @p.reset!
-          else
-            client.parse_response_header(h, @p.http_version, @p.status_code)
-            :reset if client.req.no_body?
-          end
-        else
-          # if we receive unexpected data without a pending client request
-          # reset the parser to avoid firing any further callbacks and close
-          # the connection because we're processing invalid HTTP
-          @p.reset!
-          unbind
+      @current_header = ""
+      @headers = {}
+
+      @p = HttpParser::Parser.new do |parser|
+        parser.on_header_field do |inst, field_name|
+          @current_header = field_name
         end
-      end
 
-      @p.on_body = proc do |b|
-        client.on_body_data(b)
-      end
+        parser.on_header_value do |inst, field_value|
+          @headers[@current_header] = field_value
+        end
 
-      @p.on_message_complete = proc do
-        if !client.continue?
-          c = @clients.shift
-          c.state = :finished
-          c.on_request_complete
+        parser.on_headers_complete do |parser_instance|
+          if client
+            if parser_instance.http_status == 100
+              client.send_request_body
+            else
+              client.parse_response_header(@headers, parser_instance.http_version, parser_instance.http_status)
+            end
+          end
+        end
+
+        parser.on_body do |parser_instance, body|
+          client.on_body_data(body)
+        end
+
+        parser.on_message_complete do
+          @resp.reset!
+          @current_header = ""
+          @headers = {}
+          if !client.continue?
+            c = @clients.shift
+            c.state = :finished
+            c.on_request_complete
+          end
         end
       end
     end
@@ -216,8 +222,11 @@ module EventMachine
 
     def receive_data(data)
       begin
-        @p << data
-      rescue HTTP::Parser::Error => e
+        @resp = HttpParser::Parser.new_instance do |inst|
+          inst.type = :response
+        end
+        @p.parse(@resp, data)
+      rescue HttpParser::Error => e
         c = @clients.shift
         c.nil? ? unbind(e.message) : c.on_error(e.message)
       end
@@ -276,7 +285,6 @@ module EventMachine
         @clients.push r
 
         r.reset!
-        @p.reset!
 
         begin
           @conn.set_deferred_status :unknown

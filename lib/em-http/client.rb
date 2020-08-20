@@ -251,13 +251,9 @@ module EventMachine
         @response_header[key.upcase.gsub('-','_')] = val
       end
 
-      @response_header.http_version = version.join('.')
+      @response_header.http_version = version
       @response_header.http_status  = status
       @response_header.http_reason  = CODE[status] || 'unknown'
-
-      # invoke headers callback after full parse
-      # if one is specified by the user
-      @headers.call(@response_header) if @headers
 
       unless @response_header.http_status and @response_header.http_reason
         @state = :invalid
@@ -321,6 +317,10 @@ module EventMachine
       if String.method_defined?(:force_encoding) && /;\s*charset=\s*(.+?)\s*(;|$)/.match(content_type)
         @content_charset = Encoding.find($1.gsub(/^\"|\"$/, '')) rescue Encoding.default_external
       end
+
+      # invoke headers callback after full parse
+      # if one is specified by the user
+      @headers.call(@response_header) if @headers
     end
 
     class CookieJar

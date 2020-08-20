@@ -1,7 +1,7 @@
 require 'eventmachine'
 require 'em-socksify'
 require 'addressable/uri'
-require 'http/parser'
+require 'http-parser'
 
 require 'base64'
 require 'socket'
