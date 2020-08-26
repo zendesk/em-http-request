@@ -1,5 +1,7 @@
 source 'http://rubygems.org'
 
+gem 'http_parser.rb', git: 'https://github.com/Mehul-Porwal/http_parser.rb', branch: 'mporwal/VEGEMITE-347/upgrade_header'
+
 gemspec
 
 group :benchmark do
