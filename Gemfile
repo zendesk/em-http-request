@@ -1,5 +1,9 @@
 source 'http://rubygems.org'
 
+source 'https://zdrepo.jfrog.io/zdrepo/api/gems/gems-local/' do
+  gem 'http_parser.rb', '~> 0.6.2'
+end
+
 gemspec
 
 group :benchmark do
